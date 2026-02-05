@@ -1,0 +1,143 @@
+// AMD Module Loader
+// 
+// This module provides an AMD (Asynchronous Module Definition) loader shim
+// that allows SPFx bundles to load and register their modules.
+
+import { initializeSpfxMocks } from '../mocks/SpfxMocks';
+
+export class AmdLoader {
+    private amdModules: Record<string, any>;
+    private amdPending: Record<string, Array<(module: any) => void>>;
+
+    constructor() {
+        this.amdModules = {};
+        this.amdPending = {};
+        window.__amdModules = this.amdModules;
+        window.__amdPending = this.amdPending;
+    }
+
+    initialize(): void {
+        // Verify React loaded from CDN
+        if (!window.React || !window.ReactDOM) {
+            console.error('AmdLoader - React not loaded from CDN!');
+            return;
+        }
+
+        // Initialize SPFx mocks
+        initializeSpfxMocks();
+
+        // Set up AMD define function
+        this.setupDefine();
+
+        // Set up AMD require function
+        this.setupRequire();
+    }
+
+    private setupDefine(): void {
+        window.define = (name: any, deps?: any, factory?: any) => {
+            // Handle different call signatures
+            if (typeof name !== 'string') {
+                factory = deps || name;
+                deps = Array.isArray(name) ? name : [];
+                name = '_anonymous_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            }
+            if (typeof deps === 'function') {
+                factory = deps;
+                deps = [];
+            }
+
+            // Resolve dependencies
+            const resolvedDeps = (deps as string[]).map(dep => this.resolveDependency(dep));
+
+            let moduleExports: any;
+            if (typeof factory === 'function') {
+                const exportsIndex = (deps as string[]).indexOf('exports');
+                const moduleIndex = (deps as string[]).indexOf('module');
+
+                try {
+                    moduleExports = factory.apply(null, resolvedDeps);
+                } catch (e: any) {
+                    console.error('AmdLoader - Error executing factory for', name, e);
+                }
+
+                if (moduleExports === undefined && exportsIndex >= 0) {
+                    moduleExports = resolvedDeps[exportsIndex];
+                }
+                if (moduleExports === undefined && moduleIndex >= 0) {
+                    moduleExports = resolvedDeps[moduleIndex].exports;
+                }
+            } else {
+                moduleExports = factory;
+            }
+
+            this.amdModules[name] = moduleExports;
+
+            // Store by short name too
+            const shortName = name.split('/').pop();
+            if (shortName && shortName !== name) {
+                this.amdModules[shortName] = moduleExports;
+            }
+
+            // Resolve pending requires
+            if (this.amdPending[name]) {
+                this.amdPending[name].forEach(cb => cb(moduleExports));
+                delete this.amdPending[name];
+            }
+        };
+
+        (window.define as any).amd = { jQuery: true };
+    }
+
+    private setupRequire(): void {
+        window.require = (deps: any, callback?: any) => {
+            if (typeof deps === 'string') {
+                return this.amdModules[deps] || (window as any)[deps] || {};
+            }
+
+            const resolved = (deps as string[]).map(dep => 
+                this.amdModules[dep] || (window as any)[dep] || {}
+            );
+            
+            if (callback) {
+                callback.apply(null, resolved);
+            }
+            return resolved[0];
+        };
+
+        (window.require as any).config = function() {};
+        window.requirejs = window.require;
+    }
+
+    private resolveDependency(dep: string): any {
+        if (dep === 'exports') return {};
+        if (dep === 'require') return window.require;
+        if (dep === 'module') return { exports: {} };
+
+        // Try to find the module
+        let mod = this.amdModules[dep];
+        if (!mod) {
+            // Try common variations
+            const variations = [
+                dep,
+                dep.replace(/^@/, '').replace(/\//g, '-'),
+                dep.split('/').pop() || dep
+            ];
+            for (const v of variations) {
+                if (this.amdModules[v]) {
+                    mod = this.amdModules[v];
+                    break;
+                }
+            }
+        }
+        if (!mod) mod = (window as any)[dep];
+        if (!mod) {
+            console.warn('AmdLoader - Missing dependency:', dep);
+            mod = {};
+        }
+        return mod;
+    }
+
+    getModules(): Record<string, any> {
+        return this.amdModules;
+    }
+}

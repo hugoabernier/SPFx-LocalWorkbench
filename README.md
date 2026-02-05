@@ -1,1 +1,170 @@
-# SPFx-LocalWorkbench
+# SPFx Local Workbench
+
+A Visual Studio Code extension that brings back the **local workbench** for testing SharePoint Framework (SPFx) web parts without deploying to SharePoint.
+
+> **Background**: Microsoft removed the local workbench in SPFx 1.13+. This extension restores that functionality with a custom-built workbench environment that simulates the SPFx runtime.
+
+## Features
+
+- **Automatic SPFx Detection**: Automatically detects SPFx projects in your workspace
+- **Web Part Discovery**: Parses all web part manifests from your project  
+- **SPFx Runtime Environment**: Custom-built workbench that simulates the SPFx runtime with AMD module loading
+- **Property Pane**: Full property pane support for configuring web parts
+- **Live Reload Support**: Works with `heft start` or `gulp serve` for real-time development
+- **Multiple Web Parts**: Add, configure, and test multiple web parts simultaneously on the canvas
+- **Theme Support**: Choose from multiple SharePoint theme presets (Team Site, Communication Site, Dark Mode)
+
+## Requirements
+
+- VS Code 1.100.0 or higher
+- An SPFx project
+- Node.js and npm/pnpm/yarn
+
+## Getting Started
+
+1. Open your SPFx project in VS Code
+2. Start your SPFx development server:
+   - **SPFx 1.22+**: Run `heft start` in a terminal
+   - **Legacy SPFx**: Run `gulp serve --nobrowser` in a terminal
+3. Use the Command Palette (`Ctrl+Shift+P`) and search for "SPFx: Open Local Workbench"
+
+## Usage
+
+### Opening the Workbench
+
+There are several ways to open the workbench:
+
+1. **Command Palette**: `Ctrl+Shift+P` → "SPFx: Open Local Workbench"
+2. **Status Bar**: Click the "SPFx Workbench" status bar item (shown when an SPFx project is detected)
+3. **Quick Command**: Use "SPFx: Start Serve & Open Workbench" to start everything at once
+
+### Starting Development Server
+
+Use the command "SPFx: Start Serve & Open Workbench" to:
+1. Automatically detect your SPFx version
+2. Start `heft start` (SPFx 1.22+) or `gulp serve --nobrowser` (legacy) in a terminal
+3. Open the workbench after a short delay
+
+### How It Works
+
+This extension provides a **custom-built workbench environment** that simulates the SPFx runtime:
+
+1. A TypeScript-based workbench runtime is bundled with the extension
+2. When you open the workbench, it loads in a VS Code webview
+3. An AMD module loader shim allows SPFx bundles to load and register their modules
+4. Mock SharePoint context and APIs are provided to web parts
+5. The runtime fetches your web part bundles from `https://localhost:4321`
+6. Your web parts render in a simulated SharePoint environment
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `SPFx: Open Local Workbench` | Opens the local workbench panel |
+| `SPFx: Start Serve & Open Workbench` | Starts serve and opens workbench |
+| `SPFx: Detect Web Parts` | Shows detected web parts in the project |
+
+## Configuration
+
+### Basic Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `spfxLocalWorkbench.serveUrl` | `https://localhost:4321` | The URL where SPFx serve is running |
+| `spfxLocalWorkbench.autoOpenWorkbench` | `false` | Auto-open workbench when starting serve |
+| `spfxLocalWorkbench.devProxyEnabled` | `false` | Enable Dev Proxy integration |
+| `spfxLocalWorkbench.devProxyPort` | `8000` | Dev Proxy port |
+
+### Context Settings
+
+Customize the mock SharePoint context:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `spfxLocalWorkbench.context.siteUrl` | `https://contoso.sharepoint.com/sites/devsite` | SharePoint site URL |
+| `spfxLocalWorkbench.context.webUrl` | `https://contoso.sharepoint.com/sites/devsite` | SharePoint web URL |
+| `spfxLocalWorkbench.context.userDisplayName` | `Local Workbench User` | Display name of the current user |
+| `spfxLocalWorkbench.context.userEmail` | `user@contoso.onmicrosoft.com` | Email address of the current user |
+| `spfxLocalWorkbench.context.culture` | `en-US` | Culture/locale (e.g., en-US, de-DE, fr-FR) |
+| `spfxLocalWorkbench.context.customContext` | `{}` | Additional custom context properties (JSON object) |
+
+### Theme Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `spfxLocalWorkbench.theme.preset` | `teamSite` | Theme preset: `teamSite`, `communicationSite`, `dark`, `highContrast`, or `custom` |
+| `spfxLocalWorkbench.theme.customColors` | `{}` | Custom theme colors when using `custom` preset |
+
+### Page Context Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `spfxLocalWorkbench.pageContext.webTitle` | `Local Workbench` | Title of the web |
+| `spfxLocalWorkbench.pageContext.webTemplate` | `STS#3` | Web template ID |
+| `spfxLocalWorkbench.pageContext.isSPO` | `true` | Whether this is SharePoint Online |
+
+### Logging Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `spfxLocalWorkbench.logging.enabled` | `true` | Enable logging in the output channel |
+| `spfxLocalWorkbench.logging.verbose` | `false` | Enable verbose logging for debugging |
+
+## Troubleshooting
+
+### "Could not load manifests from serve URL"
+- Make sure `heft start` or `gulp serve` is running
+- Check that the serve URL matches your SPFx project's port (default: 4321)
+- Accept the self-signed certificate in your browser first: visit `https://localhost:4321`
+
+### Web parts not rendering
+- Open DevTools in the workbench (click "DevTools" button) to see console errors
+- Verify your SPFx project builds successfully
+- Check that your web part bundle is being served correctly
+
+### Certificate errors
+SPFx uses HTTPS with a self-signed certificate. You may need to:
+1. Visit `https://localhost:4321` in your browser
+2. Accept the security warning / add certificate exception
+3. Refresh the workbench
+
+## Development
+
+### Building the Extension
+
+```bash
+npm install
+npm run compile
+```
+
+### Project Structure
+
+```
+src/
+  extension.ts              # Main extension entry point
+  workbench/
+    WorkbenchPanel.ts       # Webview panel that hosts the workbench
+    SpfxProjectDetector.ts  # SPFx project detection and manifest parsing
+    html/                   # HTML and CSS generation for webview
+    config/                 # Configuration management
+    types/                  # Type definitions
+webview/
+  src/
+    main.tsx                # React-based webview entry point
+    main.ts                 # Alternative non-React entry point
+    WorkbenchRuntime.ts     # Main workbench orchestrator
+    WebPartManager.ts       # Web part loading and lifecycle
+    amd/                    # AMD module loader for SPFx bundles
+    components/             # React components (App, Canvas, PropertyPane, etc.)
+    mocks/                  # SharePoint API mocks (Context, Theme, PropertyPane)
+    ui/                     # UI utilities (CanvasRenderer)
+    types/                  # Webview-specific type definitions
+```
+
+## License
+
+MIT License - See LICENSE file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues and pull requests.

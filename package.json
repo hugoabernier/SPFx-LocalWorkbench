@@ -1,0 +1,217 @@
+{
+  "name": "spfx-local-workbench",
+  "displayName": "SPFx Local Workbench",
+  "description": "A local workbench for testing SharePoint Framework (SPFx) web parts without deploying to SharePoint",
+  "version": "0.0.1",
+  "publisher": "BeauCameron",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/spfx-local-workbench"
+  },
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other",
+    "Debuggers"
+  ],
+  "keywords": [
+    "SPFx",
+    "SharePoint",
+    "SharePoint Framework",
+    "Web Parts",
+    "Workbench",
+    "Local Development"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "spfx-local-workbench.openWorkbench",
+        "title": "Open Local Workbench",
+        "category": "SPFx",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "spfx-local-workbench.startServe",
+        "title": "Start Serve & Open Workbench",
+        "category": "SPFx",
+        "icon": "$(play)"
+      },
+      {
+        "command": "spfx-local-workbench.detectWebParts",
+        "title": "Detect Web Parts",
+        "category": "SPFx",
+        "icon": "$(search)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "spfx-local-workbench.openWorkbench",
+          "when": "resourceFilename =~ /\\.manifest\\.json$/",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "SPFx Local Workbench",
+      "properties": {
+        "spfxLocalWorkbench.serveUrl": {
+          "type": "string",
+          "default": "https://localhost:4321",
+          "description": "The URL where the SPFx serve is running"
+        },
+        "spfxLocalWorkbench.autoOpenWorkbench": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically open the workbench when starting serve"
+        },
+        "spfxLocalWorkbench.devProxyEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Dev Proxy integration for API mocking"
+        },
+        "spfxLocalWorkbench.devProxyPort": {
+          "type": "number",
+          "default": 8000,
+          "description": "The port where Dev Proxy is running"
+        },
+        "spfxLocalWorkbench.context.siteUrl": {
+          "type": "string",
+          "default": "https://contoso.sharepoint.com/sites/devsite",
+          "description": "The SharePoint site URL to use in the mock context"
+        },
+        "spfxLocalWorkbench.context.webUrl": {
+          "type": "string",
+          "default": "https://contoso.sharepoint.com/sites/devsite",
+          "description": "The SharePoint web URL to use in the mock context"
+        },
+        "spfxLocalWorkbench.context.userDisplayName": {
+          "type": "string",
+          "default": "Local Workbench User",
+          "description": "The display name of the current user in the mock context"
+        },
+        "spfxLocalWorkbench.context.userEmail": {
+          "type": "string",
+          "default": "user@contoso.onmicrosoft.com",
+          "description": "The email address of the current user in the mock context"
+        },
+        "spfxLocalWorkbench.context.userLoginName": {
+          "type": "string",
+          "default": "i:0#.f|membership|user@contoso.onmicrosoft.com",
+          "description": "The login name of the current user in the mock context"
+        },
+        "spfxLocalWorkbench.context.culture": {
+          "type": "string",
+          "default": "en-US",
+          "description": "The culture/locale to use in the mock context (e.g., en-US, de-DE, fr-FR)"
+        },
+        "spfxLocalWorkbench.context.isAnonymousGuestUser": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the user is an anonymous guest"
+        },
+        "spfxLocalWorkbench.context.customContext": {
+          "type": "object",
+          "default": {},
+          "description": "Additional custom context properties to merge into the mock context (JSON object)",
+          "additionalProperties": true
+        },
+        "spfxLocalWorkbench.theme.preset": {
+          "type": "string",
+          "default": "teamSite",
+          "enum": [
+            "teamSite",
+            "communicationSite",
+            "dark",
+            "highContrast",
+            "custom"
+          ],
+          "enumDescriptions": [
+            "Default SharePoint Team Site theme (blue)",
+            "SharePoint Communication Site theme (teal)",
+            "Dark mode theme",
+            "High contrast theme for accessibility",
+            "Use custom theme colors defined in theme.customColors"
+          ],
+          "description": "The SharePoint theme preset to use"
+        },
+        "spfxLocalWorkbench.theme.customColors": {
+          "type": "object",
+          "default": {},
+          "description": "Custom theme colors when using 'custom' preset. Keys should be SharePoint theme slot names (e.g., themePrimary, themeDark, neutralPrimary)",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "spfxLocalWorkbench.pageContext.webTitle": {
+          "type": "string",
+          "default": "Local Workbench",
+          "description": "The title of the web in the page context"
+        },
+        "spfxLocalWorkbench.pageContext.webDescription": {
+          "type": "string",
+          "default": "Local development workbench for SPFx web parts",
+          "description": "The description of the web in the page context"
+        },
+        "spfxLocalWorkbench.pageContext.webTemplate": {
+          "type": "string",
+          "default": "STS#3",
+          "description": "The web template ID (e.g., STS#3 for Team Site, SITEPAGEPUBLISHING#0 for Communication Site)"
+        },
+        "spfxLocalWorkbench.pageContext.isNoScriptEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether NoScript is enabled on the site"
+        },
+        "spfxLocalWorkbench.pageContext.isSPO": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether this is SharePoint Online (vs. on-premises)"
+        },
+        "spfxLocalWorkbench.logging.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable logging in the workbench output channel"
+        },
+        "spfxLocalWorkbench.logging.verbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose logging for debugging"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && npm-run-all compile:*",
+    "compile:extension": "node esbuild.js",
+    "compile:webview": "node webview/esbuild.config.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "watch:webview": "node webview/esbuild.config.js --watch",
+    "package": "npm run check-types && npm run lint && npm-run-all package:*",
+    "package:extension": "node esbuild.js --production",
+    "package:webview": "node webview/esbuild.config.js --production",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@fluentui/react": "^8.110.10",
+    "@types/node": "22.x",
+    "@types/react": "^17.0.0",
+    "@types/react-dom": "^17.0.0",
+    "@types/vscode": "^1.100.0",
+    "esbuild": "^0.27.2",
+    "eslint": "^9.39.2",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
+  }
+}
