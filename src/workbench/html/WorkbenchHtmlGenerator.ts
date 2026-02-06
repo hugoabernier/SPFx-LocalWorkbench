@@ -15,8 +15,10 @@ export interface IHtmlGeneratorConfig {
     nonce: string;
     serveUrl: string;
     webPartsJson: string;
+    extensionsJson?: string;
     cspSource: string;
     webPartCount: number;
+    extensionCount?: number;
     webview: vscode.Webview;
     extensionUri: vscode.Uri;
     // Theme settings from user configuration
@@ -71,14 +73,18 @@ function generateMainContent(): string {
 }
 
 // Generates the status bar HTML
-function generateStatusBar(webPartCount: number): string {
+function generateStatusBar(webPartCount: number, extensionCount: number = 0): string {
+    let countText = `${webPartCount} web part(s) detected`;
+    if (extensionCount > 0) {
+        countText += `, ${extensionCount} extension(s)`;
+    }
     return `
     <div class="status-bar">
         <div class="status-indicator">
             <div class="status-dot" id="status-dot"></div>
             <span id="status-text">Initializing...</span>
         </div>
-        <span id="webpart-count">${webPartCount} web part(s) detected</span>
+        <span id="webpart-count">${countText}</span>
     </div>
     `;
 }
@@ -92,11 +98,13 @@ function generateScripts(config: IHtmlGeneratorConfig): string {
 
     // Parse web parts from JSON string
     const webParts = JSON.parse(config.webPartsJson);
+    const extensions = config.extensionsJson ? JSON.parse(config.extensionsJson) : [];
 
     // Prepare configuration object to inject
     const workbenchConfig = {
         serveUrl: config.serveUrl,
         webParts: webParts,
+        extensions: extensions,
         theme: config.themeSettings,
         context: config.contextSettings,
         pageContext: config.pageContextSettings,
@@ -126,7 +134,7 @@ export function generateWorkbenchHtml(config: IHtmlGeneratorConfig): string {
     const head = generateHead(config);
     // Toolbar is now part of React App component, not static HTML
     const mainContent = generateMainContent();
-    const statusBar = generateStatusBar(config.webPartCount);
+    const statusBar = generateStatusBar(config.webPartCount, config.extensionCount || 0);
     const scripts = generateScripts(config);
     
     return `<!DOCTYPE html>

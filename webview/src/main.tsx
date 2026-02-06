@@ -35,11 +35,26 @@ function initialize() {
             runtime.removeWebPart(e.detail.index);
         }) as EventListener);
 
+        window.addEventListener('addExtension', ((e: CustomEvent) => {
+            runtime.addExtension(e.detail.manifestIndex);
+        }) as EventListener);
+
+        window.addEventListener('removeExtension', ((e: CustomEvent) => {
+            runtime.removeExtension(e.detail.index);
+        }) as EventListener);
+
         window.addEventListener('updateProperty', ((e: CustomEvent) => {
             runtime.updateWebPartProperty(
                 e.detail.instanceId,
                 e.detail.targetProperty,
                 e.detail.newValue
+            );
+        }) as EventListener);
+
+        window.addEventListener('updateExtensionProperties', ((e: CustomEvent) => {
+            runtime.updateExtensionProperties(
+                e.detail.instanceId,
+                e.detail.properties
             );
         }) as EventListener);
 

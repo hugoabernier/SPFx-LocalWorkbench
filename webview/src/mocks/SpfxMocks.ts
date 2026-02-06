@@ -42,6 +42,34 @@ export function initializeSpfxMocks(): void {
         enumerable: true,
         configurable: true
     });
+
+    // Mock BaseApplicationCustomizer - ES5-compatible constructor function
+    // Application Customizers use placeholders for header/footer rendering
+    function MockBaseApplicationCustomizer(this: any) {
+        this._properties = {};
+        this._context = null;
+    }
+
+    MockBaseApplicationCustomizer.prototype = {
+        constructor: MockBaseApplicationCustomizer,
+        get context() { return this._context; },
+        get properties() { return this._properties; },
+        set properties(val) { this._properties = val; },
+        onInit: function() { return Promise.resolve(); },
+        onDispose: function() {}
+    };
+
+    Object.defineProperty(MockBaseApplicationCustomizer.prototype, 'context', {
+        get: function() { return this._context; },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(MockBaseApplicationCustomizer.prototype, 'properties', {
+        get: function() { return this._properties; },
+        set: function(val) { this._properties = val; },
+        enumerable: true,
+        configurable: true
+    });
     
     // Pre-register modules for SPFx dependencies
     // React and ReactDOM come from the CDN-loaded globals
@@ -53,6 +81,21 @@ export function initializeSpfxMocks(): void {
     amdModules['@microsoft/sp-webpart-base'] = {
         BaseClientSideWebPart: MockBaseClientSideWebPart
     };
+
+    // Mock PlaceholderContent for Application Customizers
+    // This simulates the SharePoint placeholder system (Top, Bottom)
+    const PlaceholderName = {
+        Top: 0,
+        Bottom: 1
+    };
+
+    amdModules['@microsoft/sp-application-base'] = {
+        BaseApplicationCustomizer: MockBaseApplicationCustomizer,
+        PlaceholderName: PlaceholderName
+    };
+
+    // Also make it globally available for direct imports
+    (window as any)['@microsoft/sp-application-base'] = amdModules['@microsoft/sp-application-base'];
     
     amdModules['@microsoft/sp-core-library'] = {
         Version: { parse: (_v: string) => ({ major: 1, minor: 0, patch: 0 }) },
@@ -122,4 +165,22 @@ export function initializeSpfxMocks(): void {
     };
     
     amdModules['office-ui-fabric-react'] = amdModules['@fluentui/react'];
+
+    // Mock @microsoft/sp-dialog - used by Application Customizers
+    const MockDialog = {
+        alert: (message: string) => {
+            console.log('SPFx Dialog.alert:', message);
+            return Promise.resolve();
+        },
+        prompt: (message: string, _options?: any) => {
+            console.log('SPFx Dialog.prompt:', message);
+            return Promise.resolve(undefined);
+        }
+    };
+
+    amdModules['@microsoft/sp-dialog'] = {
+        Dialog: MockDialog
+    };
+
+    (window as any)['@microsoft/sp-dialog'] = amdModules['@microsoft/sp-dialog'];
 }

@@ -816,5 +816,141 @@ export function getWorkbenchStyles(): string {
             text-decoration: underline;
             color: #004578;
         }
+        
+        /* ============================================
+         * APPLICATION CUSTOMIZER PLACEHOLDER STYLES
+         * ============================================ */
+        
+        /* Header placeholder zone */
+        .app-customizer-zone {
+            position: relative;
+            width: 100%;
+        }
+        
+        .app-customizer-header {
+            border-bottom: 1px dashed transparent;
+            min-height: 0;
+            transition: min-height 0.2s, border-color 0.2s;
+        }
+        
+        .app-customizer-header:not(:empty) {
+            min-height: 4px;
+        }
+        
+        .app-customizer-header-content:not(:empty) {
+            /* content rendered by the extension */
+        }
+        
+        /* Footer placeholder zone */
+        .app-customizer-footer {
+            border-top: 1px dashed transparent;
+            min-height: 0;
+            margin-bottom: 48px; /* space for status bar */
+            transition: min-height 0.2s, border-color 0.2s;
+        }
+        
+        .app-customizer-footer:not(:empty) {
+            min-height: 4px;
+        }
+        
+        .app-customizer-footer-content:not(:empty) {
+            /* content rendered by the extension */
+        }
+        
+        /* Extension wrapper with toolbar */
+        .app-customizer-extension-wrapper {
+            position: relative;
+        }
+        
+        .app-customizer-extension-wrapper:hover .app-customizer-extension-toolbar {
+            opacity: 1;
+        }
+        
+        .app-customizer-extension-toolbar {
+            position: absolute;
+            top: 4px;
+            right: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid #edebe9;
+            border-radius: 2px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+            padding: 2px 6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+        
+        .app-customizer-extension-label {
+            font-size: 11px;
+            color: #605e5c;
+            padding-right: 4px;
+        }
+        
+        /* Add Extension zone - similar to web part add zone */
+        .app-customizer-add-zone {
+            display: flex;
+            align-items: center;
+            padding: 8px 20px;
+            position: relative;
+        }
+        
+        .app-customizer-add-zone .add-zone-line {
+            flex: 1;
+            height: 1px;
+            background: transparent;
+            transition: background 0.2s;
+        }
+        
+        .app-customizer-add-zone:hover .add-zone-line {
+            background: #0078d4;
+        }
+        
+        /* Extension picker popup */
+        .extension-picker-popup {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            border: 1px solid #edebe9;
+            border-radius: 4px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            padding: 16px;
+            min-width: 300px;
+            max-width: 400px;
+            z-index: 100;
+            display: none;
+        }
+        
+        .extension-picker-popup.open {
+            display: block;
+        }
+        
+        /* Hover label badges for placeholder zones */
+        .app-customizer-header:hover::before,
+        .app-customizer-footer:hover::before {
+            position: absolute;
+            left: 8px;
+            font-size: 10px;
+            color: #fff;
+            background: #0078d4;
+            padding: 2px 6px;
+            border-radius: 2px;
+            z-index: 5;
+            pointer-events: none;
+        }
+        
+        .app-customizer-header:hover::before {
+            content: 'Header Placeholder (Top)';
+            top: 0;
+        }
+        
+        .app-customizer-footer:hover::before {
+            content: 'Footer Placeholder (Bottom)';
+            bottom: 0;
+        }
     `;
 }

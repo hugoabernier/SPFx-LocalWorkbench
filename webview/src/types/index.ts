@@ -7,6 +7,7 @@ export interface IVsCodeApi {
 export interface IWorkbenchConfig {
     serveUrl: string;
     webParts: IWebPartManifest[];
+    extensions?: IWebPartManifest[];
     theme?: IThemeSettings;
     context?: IContextSettings;
     pageContext?: IPageContextSettings;
@@ -36,6 +37,16 @@ export interface IActiveWebPart {
     properties: Record<string, any>;
     context: any;
     instance: any;
+}
+
+export interface IActiveExtension {
+    manifest: IWebPartManifest;
+    instanceId: string;
+    properties: Record<string, any>;
+    context: any;
+    instance: any;
+    headerDomElement: HTMLDivElement | null;
+    footerDomElement: HTMLDivElement | null;
 }
 
 export interface IThemeSettings {

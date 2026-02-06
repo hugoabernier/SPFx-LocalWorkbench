@@ -28,6 +28,7 @@ export class WorkbenchPanel {
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
     private _webParts: IWebPartManifest[] = [];
+    private _extensions: IWebPartManifest[] = [];
     private _settings: IWorkbenchSettings;
 
     // Creates or reveals the workbench panel
@@ -150,9 +151,10 @@ export class WorkbenchPanel {
         }
 
         this._webParts = await detector.getWebPartManifests();
+        this._extensions = await detector.getExtensionManifests();
 
-        if (this._webParts.length === 0) {
-            vscode.window.showWarningMessage('No web parts found in this SPFx project.');
+        if (this._webParts.length === 0 && this._extensions.length === 0) {
+            vscode.window.showWarningMessage('No web parts or extensions found in this SPFx project.');
         }
     }
 
@@ -181,13 +183,16 @@ export class WorkbenchPanel {
     private _getHtmlForWebview(webview: vscode.Webview): string {
         const nonce = getNonce();
         const webPartsJson = JSON.stringify(this._webParts);
+        const extensionsJson = JSON.stringify(this._extensions);
 
         return generateWorkbenchHtml({
             nonce,
             serveUrl: this._settings.serveUrl,
             webPartsJson,
+            extensionsJson,
             cspSource: webview.cspSource,
             webPartCount: this._webParts.length,
+            extensionCount: this._extensions.length,
             webview: webview,
             extensionUri: this._extensionUri,
             themeSettings: this._settings.theme,

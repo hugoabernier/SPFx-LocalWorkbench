@@ -130,6 +130,22 @@ export class AmdLoader {
             }
         }
         if (!mod) mod = (window as any)[dep];
+        // Handle localized strings modules (e.g. 'HeaderApplicationCustomizerStrings')
+        // SPFx generates these as AMD modules; provide a Proxy that returns the key name
+        // for any property access so the extension can still render.
+        if (!mod && (dep.endsWith('Strings') || dep.includes('Strings/'))) {
+            const stringsProxy = new Proxy({} as Record<string, string>, {
+                get: (_target, prop) => {
+                    if (typeof prop === 'string') {
+                        return prop; // Return the key name as the value
+                    }
+                    return undefined;
+                }
+            });
+            this.amdModules[dep] = stringsProxy;
+            mod = stringsProxy;
+        }
+
         if (!mod) {
             console.warn('AmdLoader - Missing dependency:', dep);
             mod = {};

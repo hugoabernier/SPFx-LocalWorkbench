@@ -44,7 +44,9 @@ export class WebPartManager {
             bundlePath = 'dist/' + manifest.alias.toLowerCase() + '.js';
         }
 
-        const fullUrl = this.serveUrl + '/' + bundlePath;
+        // Use internalModuleBaseUrls as the base (preserves /dist/ path)
+        const baseUrl = manifest.loaderConfig?.internalModuleBaseUrls?.[0] || (this.serveUrl + '/');
+        const fullUrl = baseUrl + bundlePath;
 
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');

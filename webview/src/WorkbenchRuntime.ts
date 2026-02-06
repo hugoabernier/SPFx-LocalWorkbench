@@ -2,12 +2,13 @@
 // 
 // Main runtime class that manages the SPFx local workbench
 
-import type { IWorkbenchConfig, IWebPartManifest, IActiveWebPart, IVsCodeApi } from './types';
+import type { IWorkbenchConfig, IWebPartManifest, IActiveWebPart, IActiveExtension, IVsCodeApi } from './types';
 import type { IAppHandlers } from './components/App';
 import { AmdLoader } from './amd/AmdLoader';
 import { SpfxContext } from './mocks/SpfxContext';
 import { ThemeProvider } from './mocks/ThemeProvider';
 import { WebPartManager } from './WebPartManager';
+import { ExtensionManager } from './ExtensionManager';
 
 export class WorkbenchRuntime {
     private vscode: IVsCodeApi;
@@ -16,10 +17,12 @@ export class WorkbenchRuntime {
     private contextProvider: SpfxContext;
     private themeProvider: ThemeProvider;
     private webPartManager: WebPartManager;
+    private extensionManager: ExtensionManager;
     private appHandlers: IAppHandlers | null = null;
     
     private loadedManifests: IWebPartManifest[] = [];
     private activeWebParts: IActiveWebPart[] = [];
+    private activeExtensions: IActiveExtension[] = [];
 
     constructor(config: IWorkbenchConfig) {
         this.vscode = window.acquireVsCodeApi();
@@ -30,6 +33,14 @@ export class WorkbenchRuntime {
         this.contextProvider = new SpfxContext(config.context, config.pageContext);
         this.themeProvider = new ThemeProvider(config.theme);
         this.webPartManager = new WebPartManager(
+            this.vscode,
+            config.serveUrl,
+            this.contextProvider,
+            this.themeProvider,
+            config.verboseLogging || false
+        );
+
+        this.extensionManager = new ExtensionManager(
             this.vscode,
             config.serveUrl,
             this.contextProvider,
@@ -64,12 +75,14 @@ export class WorkbenchRuntime {
             this.updateConnectionStatus(true);
             
             const webPartCount = this.loadedManifests.filter(m => m.componentType === 'WebPart').length;
-            this.updateWebPartCount(webPartCount);
+            const extensionCount = this.loadedManifests.filter(m => m.componentType === 'Extension').length;
+            this.updateWebPartCount(webPartCount, extensionCount);
 
             // Update React app
             if (this.appHandlers) {
                 this.appHandlers.setManifests(this.loadedManifests);
                 this.appHandlers.setActiveWebParts(this.activeWebParts);
+                this.appHandlers.setActiveExtensions(this.activeExtensions);
             }
 
         } catch (error: any) {
@@ -85,12 +98,27 @@ export class WorkbenchRuntime {
             script.onload = () => {
                 if (window.debugManifests?.getManifests) {
                     this.loadedManifests = window.debugManifests.getManifests();
-                    this.updateStatus('Loaded ' + this.loadedManifests.length + ' web parts');
+                    const componentCount = this.loadedManifests.length;
+                    const webPartCount = this.loadedManifests.filter(m => m.componentType === 'WebPart').length;
+                    const extCount = this.loadedManifests.filter(m => m.componentType === 'Extension').length;
+                    this.updateStatus('Loaded ' + componentCount + ' components (' + webPartCount + ' web parts, ' + extCount + ' extensions)');
 
-                    // Update internal module base URLs
+                    // Update internal module base URLs - rewrite host/port
+                    // but preserve the path (e.g. /dist/) so bundle paths resolve correctly
                     this.loadedManifests.forEach(m => {
                         if (m.loaderConfig?.internalModuleBaseUrls) {
-                            m.loaderConfig.internalModuleBaseUrls = [this.config.serveUrl + '/'];
+                            m.loaderConfig.internalModuleBaseUrls = m.loaderConfig.internalModuleBaseUrls.map(url => {
+                                try {
+                                    const original = new URL(url);
+                                    const serve = new URL(this.config.serveUrl);
+                                    original.protocol = serve.protocol;
+                                    original.hostname = serve.hostname;
+                                    original.port = serve.port;
+                                    return original.toString();
+                                } catch {
+                                    return this.config.serveUrl + '/';
+                                }
+                            });
                         }
                     });
 
@@ -102,6 +130,87 @@ export class WorkbenchRuntime {
             script.onerror = () => reject(new Error('Failed to load manifests.js'));
             document.head.appendChild(script);
         });
+    }
+
+    private async loadExtensions(): Promise<void> {
+        const extensionManifests = this.loadedManifests.filter(m => m.componentType === 'Extension');
+        
+        if (extensionManifests.length === 0) {
+            return;
+        }
+
+        // Create active extension instances for each manifest
+        for (const manifest of extensionManifests) {
+            await this.addExtension(extensionManifests.indexOf(manifest));
+        }
+    }
+
+    async addExtension(manifestIndex: number): Promise<void> {
+        const extensions = this.loadedManifests.filter(m => m.componentType === 'Extension');
+        const manifest = extensions[manifestIndex];
+
+        if (!manifest) {
+            return;
+        }
+
+        const instanceId = 'ext-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const properties = manifest.preconfiguredEntries?.[0]?.properties || {};
+
+        const extension: IActiveExtension = {
+            manifest: manifest,
+            instanceId: instanceId,
+            properties: JSON.parse(JSON.stringify(properties)),
+            context: null,
+            instance: null,
+            headerDomElement: null,
+            footerDomElement: null
+        };
+
+        this.activeExtensions.push(extension);
+
+        // Update React app with extension data so DOM elements are created
+        if (this.appHandlers) {
+            this.appHandlers.setActiveExtensions([...this.activeExtensions]);
+        }
+
+        // Allow DOM to render
+        await new Promise(r => setTimeout(r, 100));
+
+        // Instantiate the extension
+        const headerEl = document.getElementById(`ext-header-${extension.instanceId}`) as HTMLDivElement;
+        const footerEl = document.getElementById(`ext-footer-${extension.instanceId}`) as HTMLDivElement;
+
+        if (headerEl && footerEl) {
+            await this.extensionManager.instantiateExtension(extension, headerEl, footerEl);
+        }
+    }
+
+    async removeExtension(index: number): Promise<void> {
+        const extension = this.activeExtensions[index];
+
+        // Dispose the extension instance
+        if (extension?.instance?.onDispose) {
+            try {
+                extension.instance.onDispose();
+            } catch (e: any) {
+                // Error disposing
+            }
+        }
+
+        // Clear DOM content
+        if (extension?.headerDomElement) {
+            extension.headerDomElement.innerHTML = '';
+        }
+        if (extension?.footerDomElement) {
+            extension.footerDomElement.innerHTML = '';
+        }
+
+        this.activeExtensions.splice(index, 1);
+
+        // Update React app
+        if (this.appHandlers) {
+            this.appHandlers.setActiveExtensions([...this.activeExtensions]);
+        }
     }
 
     async addWebPartAt(insertIndex: number, manifestIndex: number): Promise<void> {
@@ -209,6 +318,51 @@ export class WorkbenchRuntime {
         }
     }
 
+    async updateExtensionProperties(instanceId: string, properties: Record<string, any>): Promise<void> {
+        const extIndex = this.activeExtensions.findIndex(ext => ext.instanceId === instanceId);
+        if (extIndex === -1) return;
+
+        const extension = this.activeExtensions[extIndex];
+
+        // Dispose the current extension instance
+        if (extension.instance?.onDispose) {
+            try {
+                extension.instance.onDispose();
+            } catch (e: any) {
+                console.error('Workbench - Error disposing extension:', e);
+            }
+        }
+
+        // Clear DOM content
+        if (extension.headerDomElement) {
+            extension.headerDomElement.innerHTML = '';
+        }
+        if (extension.footerDomElement) {
+            extension.footerDomElement.innerHTML = '';
+        }
+
+        // Update properties
+        extension.properties = { ...properties };
+        extension.instance = null;
+        extension.context = null;
+
+        // Update React app
+        if (this.appHandlers) {
+            this.appHandlers.setActiveExtensions([...this.activeExtensions]);
+        }
+
+        // Allow DOM to render
+        await new Promise(r => setTimeout(r, 100));
+
+        // Re-instantiate with new properties
+        const headerEl = document.getElementById(`ext-header-${extension.instanceId}`) as HTMLDivElement;
+        const footerEl = document.getElementById(`ext-footer-${extension.instanceId}`) as HTMLDivElement;
+
+        if (headerEl && footerEl) {
+            await this.extensionManager.instantiateExtension(extension, headerEl, footerEl);
+        }
+    }
+
     private setupEventListeners(): void {
         // Toolbar buttons are now handled by React Toolbar component in App.tsx
         // Event listeners for toolbar actions are in main.tsx
@@ -240,10 +394,14 @@ export class WorkbenchRuntime {
         }
     }
 
-    private updateWebPartCount(count: number): void {
+    private updateWebPartCount(count: number, extensionCount?: number): void {
         const webPartCountEl = document.getElementById('webpart-count');
         if (webPartCountEl) {
-            webPartCountEl.textContent = count + ' web part(s) available';
+            let text = count + ' web part(s) available';
+            if (extensionCount && extensionCount > 0) {
+                text += ', ' + extensionCount + ' extension(s)';
+            }
+            webPartCountEl.textContent = text;
         }
     }
 
