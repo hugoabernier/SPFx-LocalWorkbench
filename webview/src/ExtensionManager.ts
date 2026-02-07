@@ -77,8 +77,13 @@ export class ExtensionManager {
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
             script.src = fullUrl;
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error('Failed to load ' + fullUrl));
+            script.onload = () => {
+                resolve();
+            };
+            script.onerror = () => {
+                console.error('ExtensionManager - Failed to load bundle:', fullUrl);
+                reject(new Error('Failed to load ' + fullUrl));
+            };
             document.head.appendChild(script);
         });
     }
@@ -337,7 +342,8 @@ export class ExtensionManager {
                 const hasFooterContent = footerElement.innerHTML.trim().length > 0;
                 
                 if (!hasHeaderContent && !hasFooterContent) {
-                    console.log('ExtensionManager - Extension rendered but no placeholder content was created. This is normal if the extension uses conditional rendering.');
+                    // Extension rendered but no placeholder content was created.
+                    // This is normal if the extension uses conditional rendering.
                 }
             }, 500);
 

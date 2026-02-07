@@ -148,6 +148,7 @@ export class WorkbenchRuntime {
         const manifest = extensions[manifestIndex];
 
         if (!manifest) {
+            console.error('WorkbenchRuntime - No manifest found at index', manifestIndex);
             return;
         }
 
@@ -176,14 +177,20 @@ export class WorkbenchRuntime {
 
         // Instantiate the extension
         const headerEl = document.getElementById(`ext-header-${extension.instanceId}`) as HTMLDivElement;
-        const footerEl = document.getElementById(`ext-footer-${extension.instanceId}`) as HTMLDivElement;
 
-        if (headerEl && footerEl) {
-            await this.extensionManager.instantiateExtension(extension, headerEl, footerEl);
+        if (!headerEl) {
+            console.error('WorkbenchRuntime - Missing DOM element for extension', extension.instanceId);
+            return;
         }
+
+        // Pass the header element for both placeholders so all content renders in one place
+        await this.extensionManager.instantiateExtension(extension, headerEl, headerEl);
     }
 
-    async removeExtension(index: number): Promise<void> {
+    async removeExtension(instanceId: string): Promise<void> {
+        const index = this.activeExtensions.findIndex(ext => ext.instanceId === instanceId);
+        if (index === -1) return;
+        
         const extension = this.activeExtensions[index];
 
         // Dispose the extension instance

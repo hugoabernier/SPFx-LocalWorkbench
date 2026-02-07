@@ -40,7 +40,7 @@ function initialize() {
         }) as EventListener);
 
         window.addEventListener('removeExtension', ((e: CustomEvent) => {
-            runtime.removeExtension(e.detail.index);
+            runtime.removeExtension(e.detail.instanceId);
         }) as EventListener);
 
         window.addEventListener('updateProperty', ((e: CustomEvent) => {
