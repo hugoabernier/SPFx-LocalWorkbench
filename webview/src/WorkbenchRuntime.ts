@@ -8,6 +8,7 @@ import { AmdLoader } from './amd/AmdLoader';
 import { SpfxContext } from './mocks/SpfxContext';
 import { ThemeProvider } from './mocks/ThemeProvider';
 import { WebPartManager } from './WebPartManager';
+import { initializeSpfxMocks } from './mocks/SpfxMocks';
 import { ExtensionManager } from './ExtensionManager';
 
 export class WorkbenchRuntime {
@@ -92,7 +93,7 @@ export class WorkbenchRuntime {
     private async loadManifests(): Promise<void> {
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = this.config.serveUrl + '/temp/build/manifests.js';
+            script.src = this.config.serveUrl + '/temp/build/manifests.js?_v=' + Date.now();
             script.onload = () => {
                 if (window.debugManifests?.getManifests) {
                     this.loadedManifests = window.debugManifests.getManifests();
@@ -371,6 +372,68 @@ export class WorkbenchRuntime {
     private setupEventListeners(): void {
         // Toolbar buttons are now handled by React Toolbar component in App.tsx
         // Event listeners for toolbar actions are in main.tsx
+    }
+    async liveReload(): Promise<void> {
+        console.log('[Workbench] Live reload triggered — reloading bundles...');
+        this.updateStatus('Reloading...');
+
+        for (const wp of this.activeWebParts) {
+            wp.instance = null;
+        }
+
+        for (const ext of this.activeExtensions) {
+            ext.instance = null;
+        }
+
+        if (window.__amdModules) {
+            for (const key of Object.keys(window.__amdModules)) {
+                delete window.__amdModules[key];
+            }
+        }
+
+        initializeSpfxMocks();
+
+        const serveOrigin = new URL(this.config.serveUrl).origin;
+        document.querySelectorAll('script[src]').forEach(script => {
+            const src = script.getAttribute('src') || '';
+            if (src.startsWith(serveOrigin)) {
+                script.remove();
+            }
+        });
+
+        try {
+            await this.loadManifests();
+
+            const webPartCount = this.loadedManifests.filter(m => m.componentType === 'WebPart').length;
+            const extensionCount = this.loadedManifests.filter(m => m.componentType === 'Extension').length;
+            this.updateWebPartCount(webPartCount, extensionCount);
+
+            if (this.appHandlers) {
+                this.appHandlers.setManifests(this.loadedManifests);
+            }
+        } catch (error: any) {
+            console.error('[Workbench] Live reload — failed to load manifests:', error);
+            this.updateStatus('Reload failed: ' + (error.message || error));
+            return;
+        }
+
+        for (let i = 0; i < this.activeWebParts.length; i++) {
+            const domElement = document.getElementById('webpart-' + i);
+            if (domElement) {
+                await this.webPartManager.instantiateWebPart(this.activeWebParts[i], domElement);
+            }
+        }
+
+        for (const ext of this.activeExtensions) {
+            const headerEl = document.getElementById(`ext-header-${ext.instanceId}`) as HTMLDivElement;
+            if (headerEl) {
+                await this.extensionManager.instantiateExtension(ext, headerEl, headerEl);
+            }
+        }
+
+        this.updateStatus('Reloaded');
+        this.updateConnectionStatus(true);
+        console.log('[Workbench] Live reload complete');
     }
 
     handleRefresh(): void {

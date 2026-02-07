@@ -66,6 +66,14 @@ function initialize() {
             runtime.handleOpenDevTools();
         }) as EventListener);
 
+        // Listen for live reload messages from the extension
+        window.addEventListener('message', (event: MessageEvent) => {
+            const message = event.data;
+            if (message && message.command === 'liveReload') {
+                runtime.liveReload();
+            }
+        });
+
         // Mount React app
         const root = document.getElementById('root');
         if (!root) {
