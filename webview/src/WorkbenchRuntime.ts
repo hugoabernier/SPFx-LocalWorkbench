@@ -213,8 +213,12 @@ export class WorkbenchRuntime {
             }
 
             // Clear DOM content
-            extension.headerDomElement.innerHTML = '';
-            extension.footerDomElement.innerHTML = '';
+            if (extension.headerDomElement) {
+                extension.headerDomElement.innerHTML = '';
+            }
+            if (extension.footerDomElement) {
+                extension.footerDomElement.innerHTML = '';
+            }
         }
 
         this.activeExtensions.splice(index, 1);
@@ -360,8 +364,12 @@ export class WorkbenchRuntime {
             }
 
             // Clear DOM content
-            extension.headerDomElement.innerHTML = '';
-            extension.footerDomElement.innerHTML = '';
+            if (extension.headerDomElement) {
+                extension.headerDomElement.innerHTML = '';
+            }
+            if (extension.footerDomElement) {
+                extension.footerDomElement.innerHTML = '';
+            }
         }
 
         // Replace with a fresh config (strips runtime state)

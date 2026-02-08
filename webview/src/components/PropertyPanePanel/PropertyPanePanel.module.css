@@ -11,10 +11,10 @@
     transform: translateX(100%);
     transition: transform 0.3s ease;
     z-index: 1000;
-}
 
-.panel.open {
-    transform: translateX(0);
+    &.open {
+        transform: translateX(0);
+    }
 }
 
 .content {
