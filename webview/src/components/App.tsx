@@ -1,5 +1,6 @@
 import React, { useState, useEffect, FC } from 'react';
-import type { IWorkbenchConfig, IWebPartManifest, IActiveWebPart, IActiveExtension } from '../types';
+import type { IWorkbenchConfig, IWebPartManifest, IWebPartConfig, IActiveWebPart, IExtensionConfig } from '../types';
+import { isActiveWebPart } from '../types';
 import { WorkbenchCanvas } from './WorkbenchCanvas';
 import { PropertyPanePanel } from './PropertyPanePanel';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -15,8 +16,8 @@ interface IAppProps {
 
 export interface IAppHandlers {
     setManifests: (manifests: IWebPartManifest[]) => void;
-    setActiveWebParts: (webParts: IActiveWebPart[]) => void;
-    setActiveExtensions: (extensions: IActiveExtension[]) => void;
+    setActiveWebParts: (webParts: IWebPartConfig[]) => void;
+    setActiveExtensions: (extensions: IExtensionConfig[]) => void;
     openPropertyPane: (webPart: IActiveWebPart) => void;
     closePropertyPane: () => void;
     updateWebPartProperties: (instanceId: string, properties: any) => void;
@@ -24,10 +25,10 @@ export interface IAppHandlers {
 
 export const App: FC<IAppProps> = ({ config, onInitialized }) => {
     const [manifests, setManifests] = useState<IWebPartManifest[]>([]);
-    const [activeWebParts, setActiveWebParts] = useState<IActiveWebPart[]>([]);
-    const [activeExtensions, setActiveExtensions] = useState<IActiveExtension[]>([]);
-    const [selectedWebPart, setSelectedWebPart] = useState<IActiveWebPart | null>(null);
-    const [selectedExtension, setSelectedExtension] = useState<IActiveExtension | null>(null);
+    const [activeWebParts, setActiveWebParts] = useState<IWebPartConfig[]>([]);
+    const [activeExtensions, setActiveExtensions] = useState<IExtensionConfig[]>([]);
+    const [selectedWebPart, setSelectedWebPart] = useState<IActiveWebPart>();
+    const [selectedExtension, setSelectedExtension] = useState<IExtensionConfig>();
     const [extensionPickerOpen, setExtensionPickerOpen] = useState(false);
 
     const extensionManifests = manifests.filter(m => m.componentType === 'Extension');
@@ -39,7 +40,7 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
             setActiveWebParts,
             setActiveExtensions,
             openPropertyPane: (webPart: IActiveWebPart) => setSelectedWebPart(webPart),
-            closePropertyPane: () => setSelectedWebPart(null),
+            closePropertyPane: () => setSelectedWebPart(undefined),
             updateWebPartProperties: (instanceId: string, properties: any) => {
                 setActiveWebParts(prev => prev.map(wp => 
                     wp.instanceId === instanceId ? { ...wp, properties } : wp
@@ -71,7 +72,7 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
                 
                 {/* Application Customizer Header Placeholder */}
                 <div className="app-customizer-zone app-customizer-header" id="app-customizer-header">
-                    {activeExtensions.map((ext, index) => (
+                    {activeExtensions.map((ext) => (
                         <div key={ext.instanceId} className="app-customizer-extension-wrapper">
                             <div className="app-customizer-extension-toolbar">
                                 <span className="app-customizer-extension-label">
@@ -136,8 +137,11 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
                     }}
                     onEditWebPart={(index) => {
                         const webPart = activeWebParts[index];
-                        if (webPart) {
+                        console.log('Selected web part for editing:', webPart);
+                        if (webPart && isActiveWebPart(webPart)) {
                             setSelectedWebPart(webPart);
+                        } else {
+                            console.warn(`Web part at index ${index} is not active or does not exist.`);
                         }
                     }}
                     onDeleteWebPart={(index) => {
@@ -157,7 +161,7 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
 
                 <PropertyPanePanel
                     webPart={selectedWebPart}
-                    onClose={() => setSelectedWebPart(null)}
+                    onClose={() => setSelectedWebPart(undefined)}
                     onPropertyChange={(targetProperty, newValue) => {
                         if (selectedWebPart) {
                             window.dispatchEvent(new CustomEvent('updateProperty', {
@@ -173,12 +177,12 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
 
                 <ExtensionPropertiesPanel
                     extension={selectedExtension}
-                    onClose={() => setSelectedExtension(null)}
+                    onClose={() => setSelectedExtension(undefined)}
                     onPropertyChange={(instanceId, properties) => {
                         window.dispatchEvent(new CustomEvent('updateExtensionProperties', {
                             detail: { instanceId, properties }
                         }));
-                        setSelectedExtension(null);
+                        setSelectedExtension(undefined);
                     }}
                 />
             </div>

@@ -8,10 +8,10 @@ import {
     PrimaryButton,
     Separator
 } from '@fluentui/react';
-import type { IActiveExtension } from '../types';
+import type { IExtensionConfig } from '../types';
 
 interface IExtensionPropertiesPanelProps {
-    extension: IActiveExtension | null;
+    extension?: IExtensionConfig;
     onClose: () => void;
     onPropertyChange: (instanceId: string, properties: Record<string, any>) => void;
 }

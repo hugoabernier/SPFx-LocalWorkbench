@@ -30,22 +30,47 @@ export interface IWebPartManifest {
     }>;
 }
 
-export interface IActiveWebPart {
-    manifest: IWebPartManifest;
-    instanceId: string;
-    properties: Record<string, any>;
-    context: any;
-    instance: any;
+export interface IBaseClientSideWebPart {
+    render: () => void;
+    onDispose: () => void;
+    onPropertyPaneFieldChanged(propertyPath: string, oldValue: any, newValue: any): void;
+    getPropertyPaneConfiguration: () => IPropertyPaneConfiguration;
 }
 
-export interface IActiveExtension {
+/** Web part configuration before instantiation (no runtime state). */
+export interface IWebPartConfig {
     manifest: IWebPartManifest;
     instanceId: string;
     properties: Record<string, any>;
+}
+
+/** Fully instantiated web part with runtime context and instance. */
+export interface IActiveWebPart extends IWebPartConfig {
+    context: any;
+    instance: IBaseClientSideWebPart;
+}
+
+export function isActiveWebPart(wp: IWebPartConfig): wp is IActiveWebPart {
+    return 'instance' in wp && (wp as any).instance !== null;
+}
+
+/** Extension configuration before instantiation (no runtime state). */
+export interface IExtensionConfig {
+    manifest: IWebPartManifest;
+    instanceId: string;
+    properties: Record<string, any>;
+}
+
+/** Fully instantiated extension with runtime context, instance, and DOM elements. */
+export interface IActiveExtension extends IExtensionConfig {
     context: any;
     instance: any;
-    headerDomElement: HTMLDivElement | null;
-    footerDomElement: HTMLDivElement | null;
+    headerDomElement?: HTMLDivElement;
+    footerDomElement?: HTMLDivElement;
+}
+
+export function isActiveExtension(ext: IExtensionConfig): ext is IActiveExtension {
+    return 'instance' in ext && (ext as any).instance !== null;
 }
 
 export interface IThemeSettings {
@@ -74,6 +99,9 @@ export interface IPageContextSettings {
 }
 
 export interface IPropertyPaneConfiguration {
+    currentPage?: number;
+    showLoadingIndicator?: boolean;
+    loadingIndicatorDelayTime?: number;
     pages: IPropertyPanePage[];
 }
 

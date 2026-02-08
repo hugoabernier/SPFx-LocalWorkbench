@@ -20,7 +20,7 @@ import type { IActiveWebPart } from '../types';
 import { PropertyPaneFieldType } from '../mocks/PropertyPaneMocks';
 
 interface IPropertyPanePanelProps {
-    webPart: IActiveWebPart | null;
+    webPart?: IActiveWebPart;
     onClose: () => void;
     onPropertyChange: (targetProperty: string, newValue: any) => void;
 }

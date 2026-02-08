@@ -1,11 +1,11 @@
 import React, { useState, Fragment, FC } from 'react';
 import { IconButton, Text, Stack } from '@fluentui/react';
-import type { IWebPartManifest, IActiveWebPart } from '../types';
+import type { IWebPartManifest, IWebPartConfig } from '../types';
 import { WebPartPicker } from './WebPartPicker';
 
 interface IWorkbenchCanvasProps {
     manifests: IWebPartManifest[];
-    activeWebParts: IActiveWebPart[];
+    activeWebParts: IWebPartConfig[];
     onAddWebPart: (insertIndex: number, manifestIndex: number) => void;
     onEditWebPart: (index: number) => void;
     onDeleteWebPart: (index: number) => void;
@@ -129,7 +129,7 @@ const AddZone: FC<IAddZoneProps> = ({
 };
 
 interface IWebPartZoneProps {
-    webPart: IActiveWebPart;
+    webPart: IWebPartConfig;
     index: number;
     onEdit: () => void;
     onDelete: () => void;

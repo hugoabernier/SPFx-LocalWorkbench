@@ -4,7 +4,7 @@
 // Application Customizers render content into header (Top) and footer (Bottom) 
 // placeholders on the page.
 
-import type { IWebPartManifest, IActiveExtension, IVsCodeApi } from './types';
+import type { IWebPartManifest, IExtensionConfig, IActiveExtension, IVsCodeApi } from './types';
 import { SpfxContext } from './mocks/SpfxContext';
 import { ThemeProvider } from './mocks/ThemeProvider';
 
@@ -92,34 +92,34 @@ export class ExtensionManager {
     }
 
     async instantiateExtension(
-        extension: IActiveExtension,
+        config: IExtensionConfig,
         headerElement: HTMLDivElement,
         footerElement: HTMLDivElement
-    ): Promise<void> {
+    ): Promise<IActiveExtension | undefined> {
         try {
-            await this.loadExtensionBundle(extension.manifest);
+            await this.loadExtensionBundle(config.manifest);
             await new Promise(r => setTimeout(r, 100));
 
             const context = this.createExtensionContext(
-                extension.manifest.id,
-                extension.instanceId,
+                config.manifest.id,
+                config.instanceId,
                 headerElement,
                 footerElement
             );
-            extension.context = context;
 
-            const ExtensionClass = this.findExtensionClass(extension.manifest);
+            const ExtensionClass = this.findExtensionClass(config.manifest);
 
             if (ExtensionClass && typeof ExtensionClass === 'function') {
-                await this.renderExtensionFromClass(ExtensionClass, extension, headerElement, footerElement);
-                return;
+                return await this.renderExtensionFromClass(ExtensionClass, config, context, headerElement, footerElement);
             }
 
             // Show debug info if couldn't find the class
-            this.showDebugInfo(headerElement, extension.manifest);
+            this.showDebugInfo(headerElement, config.manifest);
+            return;
 
         } catch (error: any) {
             headerElement.innerHTML = '<div class="error-message">Failed to load extension: ' + error.message + '</div>';
+            return;
         }
     }
 
@@ -295,25 +295,32 @@ export class ExtensionManager {
 
     private async renderExtensionFromClass(
         ExtensionClass: any,
-        extension: IActiveExtension,
+        config: IExtensionConfig,
+        context: any,
         headerElement: HTMLDivElement,
         footerElement: HTMLDivElement
-    ): Promise<void> {
+    ): Promise<IActiveExtension> {
         try {
             const instance = new ExtensionClass();
-            extension.instance = instance;
+            const active: IActiveExtension = {
+                ...config,
+                context,
+                instance,
+                headerDomElement: headerElement,
+                footerDomElement: footerElement
+            };
 
             // Set up the instance with our mock context
-            instance._context = extension.context;
-            this.setupProperty(instance, 'context', () => extension.context);
+            instance._context = active.context;
+            this.setupProperty(instance, 'context', () => active.context);
 
-            instance._properties = extension.properties;
+            instance._properties = active.properties;
             this.setupProperty(
                 instance,
                 'properties',
-                () => extension.properties,
+                () => active.properties,
                 (val: any) => {
-                    extension.properties = val;
+                    active.properties = val;
                     instance._properties = val;
                 }
             );
@@ -336,9 +343,6 @@ export class ExtensionManager {
             this.themeProvider.applyThemeToWebPart(headerElement);
             this.themeProvider.applyThemeToWebPart(footerElement);
 
-            extension.headerDomElement = headerElement;
-            extension.footerDomElement = footerElement;
-
             // Check if content was rendered
             setTimeout(() => {
                 const hasHeaderContent = headerElement.innerHTML.trim().length > 0;
@@ -350,9 +354,11 @@ export class ExtensionManager {
                 }
             }, 500);
 
+            return active;
         } catch (e: any) {
             console.error('ExtensionManager - Setup error:', e);
             headerElement.innerHTML = '<div class="error-message">Extension setup error: ' + e.message + '</div>';
+            throw e;
         }
     }
 

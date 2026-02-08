@@ -2,7 +2,8 @@
 // 
 // Main runtime class that manages the SPFx local workbench
 
-import type { IWorkbenchConfig, IWebPartManifest, IActiveWebPart, IActiveExtension, IVsCodeApi } from './types';
+import type { IWorkbenchConfig, IWebPartManifest, IWebPartConfig, IActiveWebPart, IExtensionConfig, IVsCodeApi } from './types';
+import { isActiveWebPart, isActiveExtension } from './types';
 import type { IAppHandlers } from './components/App';
 import { AmdLoader } from './amd/AmdLoader';
 import { SpfxContext } from './mocks/SpfxContext';
@@ -22,8 +23,8 @@ export class WorkbenchRuntime {
     private appHandlers: IAppHandlers | null = null;
     
     private loadedManifests: IWebPartManifest[] = [];
-    private activeWebParts: IActiveWebPart[] = [];
-    private activeExtensions: IActiveExtension[] = [];
+    private activeWebParts: IWebPartConfig[] = [];
+    private activeExtensions: IExtensionConfig[] = [];
 
     constructor(config: IWorkbenchConfig) {
         this.vscode = window.acquireVsCodeApi();
@@ -156,17 +157,13 @@ export class WorkbenchRuntime {
         const instanceId = 'ext-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         const properties = manifest.preconfiguredEntries?.[0]?.properties || {};
 
-        const extension: IActiveExtension = {
+        const config: IExtensionConfig = {
             manifest: manifest,
             instanceId: instanceId,
             properties: JSON.parse(JSON.stringify(properties)),
-            context: null,
-            instance: null,
-            headerDomElement: null,
-            footerDomElement: null
         };
 
-        this.activeExtensions.push(extension);
+        this.activeExtensions.push(config);
 
         // Update React app with extension data so DOM elements are created
         if (this.appHandlers) {
@@ -177,37 +174,45 @@ export class WorkbenchRuntime {
         await new Promise(r => setTimeout(r, 100));
 
         // Instantiate the extension
-        const headerEl = document.getElementById(`ext-header-${extension.instanceId}`) as HTMLDivElement;
+        const headerEl = document.getElementById(`ext-header-${config.instanceId}`) as HTMLDivElement;
 
         if (!headerEl) {
-            console.error('WorkbenchRuntime - Missing DOM element for extension', extension.instanceId);
+            console.error('WorkbenchRuntime - Missing DOM element for extension', config.instanceId);
             return;
         }
 
         // Pass the header element for both placeholders so all content renders in one place
-        await this.extensionManager.instantiateExtension(extension, headerEl, headerEl);
+        const active = await this.extensionManager.instantiateExtension(config, headerEl, headerEl);
+        if (active) {
+            const idx = this.activeExtensions.indexOf(config);
+            if (idx !== -1) {
+                this.activeExtensions[idx] = active;
+                // Update React app with the active extension
+                if (this.appHandlers) {
+                    this.appHandlers.setActiveExtensions([...this.activeExtensions]);
+                }
+            }
+        }
     }
 
     async removeExtension(instanceId: string): Promise<void> {
         const index = this.activeExtensions.findIndex(ext => ext.instanceId === instanceId);
-        if (index === -1) return;
+        if (index === -1) {return;}
         
         const extension = this.activeExtensions[index];
 
-        // Dispose the extension instance
-        if (extension?.instance?.onDispose) {
-            try {
-                extension.instance.onDispose();
-            } catch (e: any) {
-                // Error disposing
+        // Dispose the extension instance if active
+        if (isActiveExtension(extension)) {
+            if (extension.instance?.onDispose) {
+                try {
+                    extension.instance.onDispose();
+                } catch (e: any) {
+                    // Error disposing
+                }
             }
-        }
 
-        // Clear DOM content
-        if (extension?.headerDomElement) {
+            // Clear DOM content
             extension.headerDomElement.innerHTML = '';
-        }
-        if (extension?.footerDomElement) {
             extension.footerDomElement.innerHTML = '';
         }
 
@@ -230,15 +235,13 @@ export class WorkbenchRuntime {
         const instanceId = 'wp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         const properties = manifest.preconfiguredEntries?.[0]?.properties || {};
 
-        const webPart: IActiveWebPart = {
+        const config: IWebPartConfig = {
             manifest: manifest,
             instanceId: instanceId,
             properties: JSON.parse(JSON.stringify(properties)),
-            context: null,
-            instance: null
         };
 
-        this.activeWebParts.splice(insertIndex, 0, webPart);
+        this.activeWebParts.splice(insertIndex, 0, config);
 
         // Update React app
         if (this.appHandlers) {
@@ -249,16 +252,21 @@ export class WorkbenchRuntime {
         await new Promise(r => setTimeout(r, 50));
 
         // Instantiate the web part
-        await this.instantiateWebPart(webPart, insertIndex);
+        await this.instantiateWebPart(config, insertIndex);
+
+        // Update React app with the active web part
+        if (this.appHandlers) {
+            this.appHandlers.setActiveWebParts([...this.activeWebParts]);
+        }
     }
 
     async removeWebPart(index: number): Promise<void> {
         const webPart = this.activeWebParts[index];
         
-        // Dispose the web part instance
-        if (webPart?.instance?.dispose) {
+        // Dispose the web part instance if active
+        if (isActiveWebPart(webPart)) {
             try {
-                webPart.instance.dispose();
+                webPart.instance.onDispose();
             } catch (e: any) {
                 // Error disposing
             }
@@ -278,43 +286,52 @@ export class WorkbenchRuntime {
         for (let i = 0; i < this.activeWebParts.length; i++) {
             await this.instantiateWebPart(this.activeWebParts[i], i);
         }
-    }
 
-    private async instantiateWebPart(webPart: IActiveWebPart, index: number): Promise<void> {
-        const domElement = document.getElementById('webpart-' + index);
-        if (!domElement) return;
-
-        await this.webPartManager.instantiateWebPart(webPart, domElement);
-    }
-
-    openPropertyPane(webPart: IActiveWebPart): void {
+        // Update React app with the re-instantiated web parts
         if (this.appHandlers) {
+            this.appHandlers.setActiveWebParts([...this.activeWebParts]);
+        }
+    }
+
+    private async instantiateWebPart(config: IWebPartConfig, index: number): Promise<void> {
+        const domElement = document.getElementById('webpart-' + index);
+        if (!domElement) {return;}
+
+        const active = await this.webPartManager.instantiateWebPart(config, domElement);
+        if (active) {
+            this.activeWebParts[index] = active;
+        }
+    }
+
+    openPropertyPane(webPart: IWebPartConfig): void {
+        if (this.appHandlers && isActiveWebPart(webPart)) {
             this.appHandlers.openPropertyPane(webPart);
         }
     }
     
     updateWebPartProperty(instanceId: string, targetProperty: string, newValue: any): void {
         const webPart = this.activeWebParts.find(wp => wp.instanceId === instanceId);
-        if (!webPart) return;
+        if (!webPart) {return;}
 
         // Update property
         webPart.properties[targetProperty] = newValue;
 
-        // Call onPropertyPaneFieldChanged lifecycle if available
-        if (webPart.instance && typeof webPart.instance.onPropertyPaneFieldChanged === 'function') {
-            try {
-                webPart.instance.onPropertyPaneFieldChanged(targetProperty, null, newValue);
-            } catch (e: any) {
-                console.error('Workbench - Error calling onPropertyPaneFieldChanged:', e);
+        // Call lifecycle methods and re-render if instantiated
+        if (isActiveWebPart(webPart)) {
+            if (typeof webPart.instance.onPropertyPaneFieldChanged === 'function') {
+                try {
+                    webPart.instance.onPropertyPaneFieldChanged(targetProperty, null, newValue);
+                } catch (e: any) {
+                    console.error('Workbench - Error calling onPropertyPaneFieldChanged:', e);
+                }
             }
-        }
 
-        // Re-render the web part
-        if (webPart.instance && typeof webPart.instance.render === 'function') {
-            try {
-                webPart.instance.render();
-            } catch (e: any) {
-                console.error('Workbench - Error rendering web part:', e);
+            if (typeof webPart.instance.render === 'function') {
+                try {
+                    webPart.instance.render();
+                } catch (e: any) {
+                    console.error('Workbench - Error rendering web part:', e);
+                }
             }
         }
 
@@ -326,31 +343,32 @@ export class WorkbenchRuntime {
 
     async updateExtensionProperties(instanceId: string, properties: Record<string, any>): Promise<void> {
         const extIndex = this.activeExtensions.findIndex(ext => ext.instanceId === instanceId);
-        if (extIndex === -1) return;
+        if (extIndex === -1) {return;}
 
         const extension = this.activeExtensions[extIndex];
 
-        // Dispose the current extension instance
-        if (extension.instance?.onDispose) {
-            try {
-                extension.instance.onDispose();
-            } catch (e: any) {
-                console.error('Workbench - Error disposing extension:', e);
+        // Dispose the current extension instance if active
+        if (isActiveExtension(extension)) {
+            if (extension.instance?.onDispose) {
+                try {
+                    extension.instance.onDispose();
+                } catch (e: any) {
+                    console.error('Workbench - Error disposing extension:', e);
+                }
             }
-        }
 
-        // Clear DOM content
-        if (extension.headerDomElement) {
+            // Clear DOM content
             extension.headerDomElement.innerHTML = '';
-        }
-        if (extension.footerDomElement) {
             extension.footerDomElement.innerHTML = '';
         }
 
-        // Update properties
-        extension.properties = { ...properties };
-        extension.instance = null;
-        extension.context = null;
+        // Replace with a fresh config (strips runtime state)
+        const config: IExtensionConfig = {
+            manifest: extension.manifest,
+            instanceId: extension.instanceId,
+            properties: { ...properties },
+        };
+        this.activeExtensions[extIndex] = config;
 
         // Update React app
         if (this.appHandlers) {
@@ -361,11 +379,14 @@ export class WorkbenchRuntime {
         await new Promise(r => setTimeout(r, 100));
 
         // Re-instantiate with new properties
-        const headerEl = document.getElementById(`ext-header-${extension.instanceId}`) as HTMLDivElement;
-        const footerEl = document.getElementById(`ext-footer-${extension.instanceId}`) as HTMLDivElement;
+        const headerEl = document.getElementById(`ext-header-${config.instanceId}`) as HTMLDivElement;
+        const footerEl = document.getElementById(`ext-footer-${config.instanceId}`) as HTMLDivElement;
 
         if (headerEl && footerEl) {
-            await this.extensionManager.instantiateExtension(extension, headerEl, footerEl);
+            const active = await this.extensionManager.instantiateExtension(config, headerEl, footerEl);
+            if (active) {
+                this.activeExtensions[extIndex] = active;
+            }
         }
     }
 
@@ -377,13 +398,18 @@ export class WorkbenchRuntime {
         console.log('[Workbench] Live reload triggered — reloading bundles...');
         this.updateStatus('Reloading...');
 
-        for (const wp of this.activeWebParts) {
-            wp.instance = null;
-        }
+        // Strip runtime state back to configs
+        this.activeWebParts = this.activeWebParts.map(wp => ({
+            manifest: wp.manifest,
+            instanceId: wp.instanceId,
+            properties: wp.properties
+        }));
 
-        for (const ext of this.activeExtensions) {
-            ext.instance = null;
-        }
+        this.activeExtensions = this.activeExtensions.map(ext => ({
+            manifest: ext.manifest,
+            instanceId: ext.instanceId,
+            properties: ext.properties
+        }));
 
         if (window.__amdModules) {
             for (const key of Object.keys(window.__amdModules)) {
@@ -420,15 +446,28 @@ export class WorkbenchRuntime {
         for (let i = 0; i < this.activeWebParts.length; i++) {
             const domElement = document.getElementById('webpart-' + i);
             if (domElement) {
-                await this.webPartManager.instantiateWebPart(this.activeWebParts[i], domElement);
+                const active = await this.webPartManager.instantiateWebPart(this.activeWebParts[i], domElement);
+                if (active) {
+                    this.activeWebParts[i] = active;
+                }
             }
         }
 
-        for (const ext of this.activeExtensions) {
+        for (let i = 0; i < this.activeExtensions.length; i++) {
+            const ext = this.activeExtensions[i];
             const headerEl = document.getElementById(`ext-header-${ext.instanceId}`) as HTMLDivElement;
             if (headerEl) {
-                await this.extensionManager.instantiateExtension(ext, headerEl, headerEl);
+                const active = await this.extensionManager.instantiateExtension(ext, headerEl, headerEl);
+                if (active) {
+                    this.activeExtensions[i] = active;
+                }
             }
+        }
+
+        // Update React app with the re-instantiated components
+        if (this.appHandlers) {
+            this.appHandlers.setActiveWebParts([...this.activeWebParts]);
+            this.appHandlers.setActiveExtensions([...this.activeExtensions]);
         }
 
         this.updateStatus('Reloaded');
@@ -447,8 +486,8 @@ export class WorkbenchRuntime {
     private updateStatus(message: string): void {
         const loadingStatus = document.getElementById('loading-status');
         const statusText = document.getElementById('status-text');
-        if (loadingStatus) loadingStatus.textContent = message;
-        if (statusText) statusText.textContent = message;
+        if (loadingStatus) {loadingStatus.textContent = message;}
+        if (statusText) {statusText.textContent = message;}
     }
 
     private updateConnectionStatus(connected: boolean): void {
@@ -475,7 +514,7 @@ export class WorkbenchRuntime {
     }
 
     // Public API for debugging
-    getActiveWebParts(): IActiveWebPart[] {
+    getActiveWebParts(): IWebPartConfig[] {
         return this.activeWebParts;
     }
 

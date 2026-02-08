@@ -2,7 +2,7 @@
 // 
 // Handles loading, instantiation, and lifecycle of SPFx web parts
 
-import type { IWebPartManifest, IActiveWebPart, IVsCodeApi } from './types';
+import type { IWebPartManifest, IWebPartConfig, IActiveWebPart, IVsCodeApi } from './types';
 import { SpfxContext } from './mocks/SpfxContext';
 import { ThemeProvider } from './mocks/ThemeProvider';
 
@@ -61,34 +61,34 @@ export class WebPartManager {
         });
     }
 
-    async instantiateWebPart(webPart: IActiveWebPart, domElement: HTMLElement): Promise<void> {
+    async instantiateWebPart(config: IWebPartConfig, domElement: HTMLElement): Promise<IActiveWebPart | undefined> {
         if (!domElement) {
             return;
         }
 
         try {
-            await this.loadWebPartBundle(webPart.manifest);
+            await this.loadWebPartBundle(config.manifest);
             await new Promise(r => setTimeout(r, 100));
 
             const context = this.contextProvider.createMockContext(
-                webPart.manifest.id,
-                webPart.instanceId
+                config.manifest.id,
+                config.instanceId
             );
             context.domElement = domElement;
-            webPart.context = context;
 
-            const WebPartClass = this.findWebPartClass(webPart.manifest);
+            const WebPartClass = this.findWebPartClass(config.manifest);
 
             if (WebPartClass && typeof WebPartClass === 'function') {
-                await this.renderWebPartFromClass(WebPartClass, webPart, domElement);
-                return;
+                return await this.renderWebPartFromClass(WebPartClass, config, context, domElement);
             }
 
             // Show debug info if we couldn't find the class
-            this.showDebugInfo(domElement, webPart.manifest, webPart.properties);
+            this.showDebugInfo(domElement, config.manifest, config.properties);
+            return;
 
         } catch (error: any) {
             domElement.innerHTML = '<div class="error-message">Failed to load: ' + error.message + '</div>';
+            return;
         }
     }
 
@@ -173,27 +173,32 @@ export class WebPartManager {
 
     private async renderWebPartFromClass(
         WebPartClass: any,
-        webPart: IActiveWebPart,
+        config: IWebPartConfig,
+        context: any,
         domElement: HTMLElement
-    ): Promise<void> {
+    ): Promise<IActiveWebPart> {
         try {
             const instance = new WebPartClass();
-            webPart.instance = instance;
+            const active: IActiveWebPart = {
+                ...config,
+                context,
+                instance
+            };
 
             // Set up the instance with our mock context
-            instance._context = webPart.context;
-            this.setupProperty(instance, 'context', () => webPart.context);
+            instance._context = active.context;
+            this.setupProperty(instance, 'context', () => active.context);
 
             instance._domElement = domElement;
             this.setupProperty(instance, 'domElement', () => domElement);
 
-            instance._properties = webPart.properties;
+            instance._properties = active.properties;
             this.setupProperty(
                 instance,
                 'properties',
-                () => webPart.properties,
+                () => active.properties,
                 (val: any) => {
-                    webPart.properties = val;
+                    active.properties = val;
                     instance._properties = val;
                 }
             );
@@ -243,9 +248,12 @@ export class WebPartManager {
             } else {
                 domElement.innerHTML = '<div class="error-message">Web part has no render method</div>';
             }
+
+            return active;
         } catch (e: any) {
             console.error('Setup error:', e);
             domElement.innerHTML = '<div class="error-message">Setup error: ' + e.message + '</div>';
+            throw e;
         }
     }
 
