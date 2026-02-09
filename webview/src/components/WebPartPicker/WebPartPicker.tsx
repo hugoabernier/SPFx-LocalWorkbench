@@ -1,20 +1,23 @@
-import React, { useState, useEffect, FC } from 'react';
-import { SearchBox, Text, Stack, Icon } from '@fluentui/react';
+import React, { useState, useEffect, FC, useMemo } from 'react';
+import { SearchBox, Text, Stack, Icon, css } from '@fluentui/react';
 import type { IWebPartManifest } from '../../types';
 import styles from './WebPartPicker.module.css';
+import { getLocalizedString } from '../PropertyPanePanel/shared/utils';
 
 interface IWebPartPickerProps {
     insertIndex: number;
     manifests: IWebPartManifest[];
     isOpen: boolean;
     onSelect: (insertIndex: number, manifestIndex: number) => void;
+    locale?: string;
 }
 
 export const WebPartPicker: FC<IWebPartPickerProps> = ({
     insertIndex,
     manifests,
     isOpen,
-    onSelect
+    onSelect,
+    locale
 }) => {
     const [filter, setFilter] = useState('');
 
@@ -25,49 +28,53 @@ export const WebPartPicker: FC<IWebPartPickerProps> = ({
         }
     }, [isOpen]);
 
-    const webParts = manifests.filter(m => m.componentType === 'WebPart');
+
+    const webParts = useMemo(() => {
+        return manifests.filter(m => m.componentType === 'WebPart').map((wp, index) => {
+            const title = getLocalizedString(wp.preconfiguredEntries?.[0]?.title, locale) || wp.alias;
+            const description = getLocalizedString(wp.preconfiguredEntries?.[0]?.description, locale) || '';
+            return { ...wp, title, description, manifestIndex:index };
+        });
+    }, [manifests, locale]);
 
     const filteredWebParts = webParts.filter(wp => {
         if (!filter) return true;
-        const title = wp.preconfiguredEntries?.[0]?.title?.default || wp.alias;
-        return title.toLowerCase().includes(filter.toLowerCase());
+        return wp.title.toLowerCase().includes(filter.toLowerCase()) || wp.description.toLowerCase().includes(filter.toLowerCase());
     });
 
     return (
-        <div className={`${styles.popup} ${isOpen ? styles.open : ''}`} id={`picker-${insertIndex}`}>
-            <Stack tokens={{ childrenGap: 8 }} styles={{ root: { padding: '12px' } }}>
+        <div className={css(styles.popup, isOpen && styles.open)} id={`wppicker-${insertIndex}`}>
+            <Stack>
                 <SearchBox
-                    placeholder="Search web parts"
+                    placeholder="Search"
+                    className={styles.search}
                     value={filter}
                     onChange={(_, newValue) => setFilter(newValue || '')}
                     autoFocus={isOpen}
                 />
-                <Text variant="medium" styles={{ root: { fontWeight: 600 } }}>
+                <Text variant="medium" className={styles.resultsLabel}>
                     Available web parts
                 </Text>
                 <div className={styles.results} id={`picker-results-${insertIndex}`}>
                     {filteredWebParts.length > 0 ? (
                         filteredWebParts.map((wp) => {
-                            const title = wp.preconfiguredEntries?.[0]?.title?.default || wp.alias;
-                            const manifestIndex = webParts.findIndex(w => w.id === wp.id);
+                            const iconName = wp.preconfiguredEntries?.[0]?.officeFabricIconFontName;
+                            const iconSrc = wp.preconfiguredEntries?.[0]?.iconImageUrl;
                             return (
                                 <div
                                     key={wp.id}
                                     className={styles.item}
                                     data-insert={insertIndex}
-                                    data-manifest={manifestIndex}
-                                    onClick={() => onSelect(insertIndex, manifestIndex)}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        padding: '12px',
-                                        cursor: 'pointer',
-                                        borderRadius: '4px',
-                                        transition: 'background-color 0.1s'
-                                    }}
+                                    data-manifest={wp.manifestIndex}
+                                    onClick={() => onSelect(insertIndex, wp.manifestIndex)}
                                 >
-                                    <Icon iconName="WebAppBuilderFragment" styles={{ root: { fontSize: '20px', marginRight: '12px' } }} />
-                                    <Text>{title}</Text>
+                                    {iconName && (
+                                        <Icon iconName={iconName} className={styles.itemIcon} />
+                                    )}
+                                    {!iconName && iconSrc && (
+                                        <img src={iconSrc} alt="" className={styles.itemIcon} />
+                                    )}
+                                    <Text className={styles.itemText}>{wp.title}</Text>
                                 </div>
                             );
                         })
