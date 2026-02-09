@@ -5,10 +5,10 @@ import { WorkbenchCanvas } from '../WorkbenchCanvas';
 import { PropertyPanePanel } from '../PropertyPanePanel';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { Toolbar } from '../Toolbar';
-import { ExtensionPicker } from '../ExtensionPicker';
 import { ExtensionPropertiesPanel } from '../ExtensionPropertiesPanel';
 import { IconButton } from '@fluentui/react';
 import styles from './App.module.css';
+import { ComponentPicker } from '../ComponentPicker';
 
 interface IAppProps {
     config: IWorkbenchConfig;
@@ -32,7 +32,10 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
     const [selectedExtension, setSelectedExtension] = useState<IExtensionConfig>();
     const [extensionPickerOpen, setExtensionPickerOpen] = useState(false);
 
-    const extensionManifests = manifests.filter(m => m.componentType === 'Extension');
+    const availableExtensions = manifests
+        .map((m, manifestIndex) => ({ ...m, manifestIndex }))
+        .filter(m => m.componentType === 'Extension')
+        .map(ext => ({...ext, title: ext.alias}));
     
     // Expose handlers to parent (WorkbenchRuntime)
     useEffect(() => {
@@ -101,7 +104,7 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
                             />
                         </div>
                     ))}
-                    {extensionManifests.length > 0 && (
+                    {availableExtensions.length > 0 && (
                         <div className={styles.appCustomizerAddZone}>
                             <div className={styles.addZoneLine} />
                             <button
@@ -115,10 +118,12 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
                                 +
                             </button>
                             <div className={styles.addZoneLine} />
-                            <ExtensionPicker
-                                manifests={manifests}
+                            <ComponentPicker
+                                components={availableExtensions}
                                 isOpen={extensionPickerOpen}
-                                onSelect={(manifestIndex) => {
+                                resultsLabel="Available extensions"
+                                noResultsLabel="No extensions found"
+                                onSelect={(manifestIndex: number) => {
                                     setExtensionPickerOpen(false);
                                     window.dispatchEvent(new CustomEvent('addExtension', { detail: { manifestIndex } }));
                                 }}
