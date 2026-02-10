@@ -5,10 +5,10 @@ import { WorkbenchCanvas } from '../WorkbenchCanvas';
 import { PropertyPanePanel } from '../PropertyPanePanel';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { Toolbar } from '../Toolbar';
-import { ExtensionPicker } from '../ExtensionPicker';
 import { ExtensionPropertiesPanel } from '../ExtensionPropertiesPanel';
-import { IconButton } from '@fluentui/react';
+import { css, IconButton } from '@fluentui/react';
 import styles from './App.module.css';
+import { ComponentPicker } from '../ComponentPicker';
 
 interface IAppProps {
     config: IWorkbenchConfig;
@@ -32,7 +32,9 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
     const [selectedExtension, setSelectedExtension] = useState<IExtensionConfig>();
     const [extensionPickerOpen, setExtensionPickerOpen] = useState(false);
 
-    const extensionManifests = manifests.filter(m => m.componentType === 'Extension');
+    const availableExtensions = manifests
+        .filter(m => m.componentType === 'Extension')
+        .map((ext, manifestIndex) => ({...ext, title: ext.alias, manifestIndex}));
     
     // Expose handlers to parent (WorkbenchRuntime)
     useEffect(() => {
@@ -71,12 +73,12 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
             <div className={styles.workbenchApp}>
                 <Toolbar onRefresh={handleRefresh} onOpenDevTools={handleOpenDevTools} />
                 {/* Application Customizer Header Placeholder */}         
-                <div className={`${styles.appCustomizerZone} ${styles.appCustomizerHeader}`} id="app-customizer-header">
+                <div id="app-customizer-header" className={css(styles.appCustomizerZone, styles.appCustomizerHeader)}>
                     {activeExtensions.map((ext) => (
-                        <div key={ext.instanceId} className={styles.appCustomizerExtensionWrapper}>
+                        <div key={ext.instanceId + '-header'} className={styles.appCustomizerExtensionWrapper}>
                             <div className={styles.appCustomizerExtensionToolbar}>
                                 <span className={styles.appCustomizerExtensionLabel}>
-                                    {ext.manifest.preconfiguredEntries?.[0]?.title?.default || ext.manifest.alias}
+                                    {ext.manifest.alias}
                                 </span>
                                 <IconButton
                                     iconProps={{ iconName: 'Edit' }}
@@ -101,7 +103,7 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
                             />
                         </div>
                     ))}
-                    {extensionManifests.length > 0 && (
+                    {availableExtensions.length > 0 && (
                         <div className={styles.appCustomizerAddZone}>
                             <div className={styles.addZoneLine} />
                             <button
@@ -115,10 +117,12 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
                                 +
                             </button>
                             <div className={styles.addZoneLine} />
-                            <ExtensionPicker
-                                manifests={manifests}
+                            <ComponentPicker
+                                components={availableExtensions}
                                 isOpen={extensionPickerOpen}
-                                onSelect={(manifestIndex) => {
+                                resultsLabel="Available extensions"
+                                noResultsLabel="No extensions found"
+                                onSelect={(manifestIndex: number) => {
                                     setExtensionPickerOpen(false);
                                     window.dispatchEvent(new CustomEvent('addExtension', { detail: { manifestIndex } }));
                                 }}
@@ -150,6 +154,39 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
                         }));
                     }}
                 />
+
+                {/* Application Customizer Footer Placeholder */}
+                <div id="app-customizer-footer" className={css(styles.appCustomizerZone, styles.appCustomizerFooter)}>
+                    {activeExtensions.map((ext) => (
+                        <div
+                            key={ext.instanceId + '-footer'}
+                            className="app-customizer-footer-content"
+                            id={`ext-footer-${ext.instanceId}`}
+                        >
+                            <div className={styles.appCustomizerExtensionToolbar}>
+                                <span className={styles.appCustomizerExtensionLabel}>
+                                    {ext.manifest.alias}
+                                </span>
+                                <IconButton
+                                    iconProps={{ iconName: 'Edit' }}
+                                    title="Edit properties"
+                                    ariaLabel="Edit properties"
+                                    styles={{ root: { color: '#0078d4', height: 24, width: 24 }, icon: { fontSize: 12 } }}
+                                    onClick={() => setSelectedExtension(ext)}
+                                />
+                                <IconButton
+                                    iconProps={{ iconName: 'Delete' }}
+                                    title="Remove extension"
+                                    ariaLabel="Remove extension"
+                                    styles={{ root: { color: '#a80000', height: 24, width: 24 }, icon: { fontSize: 12 } }}
+                                    onClick={() => {
+                                        window.dispatchEvent(new CustomEvent('removeExtension', { detail: { instanceId: ext.instanceId } }));
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
 
                 {/* Extension picker overlay */}
                 {extensionPickerOpen && (
