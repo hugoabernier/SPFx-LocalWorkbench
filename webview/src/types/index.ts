@@ -13,6 +13,11 @@ export interface IWorkbenchConfig {
     pageContext?: IPageContextSettings;
 }
 
+export interface ILocalizedString {
+    default: string;
+    [key: string]: string;
+}
+
 export interface IWebPartManifest {
     id: string;
     alias: string;
@@ -24,8 +29,12 @@ export interface IWebPartManifest {
         scriptResources?: Record<string, any>;
     };
     preconfiguredEntries?: Array<{
-        title?: { default?: string };
-        description?: { default?: string };
+        title: ILocalizedString;
+        description: ILocalizedString;
+        officeFabricIconFontName?: string;
+        iconImageUrl?: string;
+        groupId: string;
+        group?: ILocalizedString;
         properties?: Record<string, any>;
     }>;
 }
@@ -74,6 +83,8 @@ export function isActiveExtension(ext: IExtensionConfig): ext is IActiveExtensio
 }
 
 export interface IThemeSettings {
+    preset?: 'teamSite' | 'communicationSite' | 'dark' | 'highContrast' | 'custom';
+    customColors?: Record<string, string>;
     primaryColor?: string;
     backgroundColor?: string;
     textColor?: string;

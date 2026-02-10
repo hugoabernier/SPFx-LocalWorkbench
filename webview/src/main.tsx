@@ -85,6 +85,9 @@ function initialize() {
                     runtime.handleOpenDevTools();
                     return;
             }
+            if (message && message.command === 'settingsChanged' && message.settings) {
+                runtime.updateSettings(message.settings);
+            }
         });
 
         // Mount React app
