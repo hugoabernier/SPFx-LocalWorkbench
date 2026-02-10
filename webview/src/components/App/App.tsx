@@ -4,7 +4,6 @@ import { isActiveWebPart } from '../../types';
 import { WorkbenchCanvas } from '../WorkbenchCanvas';
 import { PropertyPanePanel } from '../PropertyPanePanel';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { Toolbar } from '../Toolbar';
 import { ExtensionPicker } from '../ExtensionPicker';
 import { ExtensionPropertiesPanel } from '../ExtensionPropertiesPanel';
 import { IconButton } from '@fluentui/react';
@@ -58,18 +57,10 @@ export const App: FC<IAppProps> = ({ config, onInitialized }) => {
         onInitialized(handlers);
     }, [onInitialized]);
 
-    const handleRefresh = () => {
-        window.dispatchEvent(new CustomEvent('refresh'));
-    };
-
-    const handleOpenDevTools = () => {
-        window.dispatchEvent(new CustomEvent('openDevTools'));
-    };
 
     return (
         <ErrorBoundary>
             <div className={styles.workbenchApp}>
-                <Toolbar onRefresh={handleRefresh} onOpenDevTools={handleOpenDevTools} />
                 {/* Application Customizer Header Placeholder */}         
                 <div className={`${styles.appCustomizerZone} ${styles.appCustomizerHeader}`} id="app-customizer-header">
                     {activeExtensions.map((ext) => (
