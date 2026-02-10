@@ -1,5 +1,5 @@
 import { Icon, SearchBox, Stack, Text, css } from '@fluentui/react';
-import React, { FC, useEffect, useState } from 'react';
+import React, { FC, useEffect, useRef, useState } from 'react';
 import styles from './ComponentPicker.module.css';
 
 export interface IComponentItem {
@@ -23,11 +23,20 @@ interface IComponentPickerProps {
 export const ComponentPicker: FC<IComponentPickerProps> = props => {
     const { components, isOpen, resultsLabel, noResultsLabel, onSelect, location } = props;
     const [filter, setFilter] = useState('');
+    const [openUpward, setOpenUpward] = useState(false);
+    const popupRef = useRef<HTMLDivElement>(null);
 
     // Reset filter when picker closes
     useEffect(() => {
         if (!isOpen) {
             setFilter('');
+            setOpenUpward(false);
+        }
+        if (isOpen && popupRef.current) {
+            const rect = popupRef.current.getBoundingClientRect();
+            if (rect.bottom > window.innerHeight) {
+                setOpenUpward(true);
+            }
         }
     }, [isOpen]);
 
@@ -37,7 +46,7 @@ export const ComponentPicker: FC<IComponentPickerProps> = props => {
     });
 
     return (
-        <div className={css(styles.popup, isOpen && styles.open)}>
+        <div ref={popupRef} className={css(styles.popup, isOpen && styles.open, openUpward && styles.upward)}>
             <Stack>
                 <SearchBox
                     placeholder="Search"

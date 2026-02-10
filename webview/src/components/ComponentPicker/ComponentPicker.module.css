@@ -16,12 +16,12 @@
     &.open {
         display: block;
     }
-}
 
-/* Flip the popup above the + button when it would overflow the viewport */
-.popup.upward {
-    top: auto;
-    bottom: 100%;
+    /* Flip the popup above the + button when it would overflow the viewport */
+    &.upward {
+        top: auto;
+        bottom: 100%;
+    }
 }
 
 .search {
